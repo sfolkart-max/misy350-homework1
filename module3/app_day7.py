@@ -1,3 +1,4 @@
+
 import streamlit as st
 import json
 from pathlib import Path
@@ -43,6 +44,10 @@ inventory = [
 if "page" not in st.session_state:
     st.session_state["page"]="home"
 
+if "messages" not in st.session_state:
+    st.session_state["messages"] = [
+        {}
+    ]
 with st.sidebar:
     if st.button("Home", key="home_btn", type="primary", use_container_width=True):
         st.session_state["page"]="home"
@@ -86,4 +91,33 @@ if st.session_state["page"] == "home":
 
 elif st.session_state["page"] == "orders":
     st.markdown("Under Construction")
-    pass
+    tab1, tab2 = st.tabs(["Add New Order", "Cancel an Order"])
+
+    with tab1:
+        selected_item = st.selectbox("Items", options=inventory, key= "inventory_selector", format_func=lambda x: f"{x['name']}")
+        quantity = st.number_input("Enter the Quantity", min_value=1, step=1)
+
+        if st.button("Create New Order", key="place_order_btn", type="primary", use_container_width=True):
+            with st.spinner("Recording your order..."):
+                total = quantity * selected_item["item_id"]
+
+                for item in inventory:
+                    if item["item_id"] == selected_item["item_id"]:
+                        item["stock"] -= quantity
+                        break
+
+                orders.append({"id": str(uuid.uuid4()), "item_id": selected_item["item_id"], "quantity": quantity, "Status": "Placed", "total": total})
+                
+
+                with open(json_path_inventory, "w") as f:
+                    json.dump(inventory, f)
+
+                with open(json_path_orders, "w") as f:
+                    json.dump(orders, f)
+
+                st.balloons()
+                time.sleep(4)
+
+
+    with tab2:
+        pass

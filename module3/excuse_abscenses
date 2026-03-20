@@ -1,0 +1,148 @@
+import streamlit as st
+import json
+from datetime import datetime
+from pathlib import Path
+
+st.set_page_config(
+    page_title="Excuse Absence Management",
+    page_icon="📋",
+    layout="wide"
+)
+
+data_file = Path(__file__).parent / "absence_requests.json"
+
+if "page" not in st.session_state:
+    st.session_state.page = "Dashboard"
+
+
+def load_requests():
+    if data_file.exists():
+        try:
+            with open(data_file, 'r') as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+
+def save_requests(reqs):
+    with open(data_file, 'w') as f:
+        json.dump(reqs, f, indent=2)
+
+
+def new_request(email, absence_date, excuse_type, explanation):
+    date_str = absence_date.strftime("%Y-%m-%d")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    return {
+        "request_id": f"011{len(load_requests())+1}",
+        "status": "Pending",
+        "course_id": "011101",
+        "student_email": email,
+        "absence_date": date_str,
+        "submitted_timestamp": timestamp,
+        "excuse_type": excuse_type,
+        "explanation": explanation,
+        "instructor_note": ""
+    }
+
+
+st.sidebar.title("Navigation")
+col1, col2 = st.sidebar.columns(2)
+
+with col1:
+    if st.button("📊 Dashboard", key="btn_dashboard", use_container_width=True):
+        st.session_state.page = "Dashboard"
+        st.rerun()
+
+with col2:
+    if st.button("📝 Request", key="btn_request", use_container_width=True):
+        st.session_state.page = "Request"
+        st.rerun()
+
+st.sidebar.divider()
+
+
+def show_dashboard():
+    st.title("📊 Excuse Absence Dashboard")
+    st.write("Browse all absence requests")
+    
+    reqs = load_requests()
+    
+    if not reqs:
+        st.info("No requests yet. Submit one to get started.")
+        return
+    
+    st.subheader("Requests")
+    display_data = []
+    for idx, r in enumerate(reqs):
+        display_data.append({
+            "ID": r.get("request_id"),
+            "Status": r.get("status"),
+            "Email": r.get("student_email"),
+            "Date": r.get("absence_date"),
+            "Type": r.get("excuse_type")
+        })
+    
+    event = st.dataframe(
+        display_data,
+        on_select="rerun",
+        selection_mode="single-row",
+        use_container_width=True,
+        key="df_reqs"
+    )
+    
+    if event.selection.rows:
+        idx = event.selection.rows[0]
+        req = reqs[idx]
+        
+        st.divider()
+        st.subheader("Details")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Status", req.get("status"))
+            st.write(f"**Email:** {req.get('student_email')}")
+            st.write(f"**Course:** {req.get('course_id')}")
+            st.write(f"**Date:** {req.get('absence_date')}")
+        
+        with col2:
+            st.write(f"**Type:** {req.get('excuse_type')}")
+            st.write(f"**Submitted:** {req.get('submitted_timestamp')}")
+        
+        st.write("**Reason:**")
+        st.write(req.get("explanation"))
+        
+        if req.get("instructor_note"):
+            st.write("**Instructor Note:**")
+            st.write(req.get("instructor_note"))
+
+
+def show_request_form():
+    st.title("📝 Request Form")
+    st.write("Submit a new absence request")
+    
+    with st.form("absence_form", clear_on_submit=True):
+        email = st.text_input("Email", key="form_email")
+        absence_date = st.date_input("Absence Date", key="form_date")
+        excuse_type = st.selectbox("Reason", ["Medical", "University Competitions", "Other"], key="form_type")
+        explanation = st.text_area("Explanation", key="form_expl")
+        
+        submitted = st.form_submit_button("Submit Request")
+        
+        if submitted:
+            if email and explanation:
+                req = new_request(email, absence_date, excuse_type, explanation)
+                reqs = load_requests()
+                reqs.append(req)
+                save_requests(reqs)
+                st.success("Request submitted!")
+                st.rerun()
+            else:
+                st.error("Fill in all fields")
+
+
+if st.session_state.page == "Dashboard":
+    show_dashboard()
+else:
+    show_request_form()
